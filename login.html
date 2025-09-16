@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeakinPay - Next-Gen Student Payments</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+</head>
+<body>
+    <!-- Login Page -->
+    <div id="loginPage" class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <img src="deakin-logo.jpg" alt="Deakin" height="45">
+                <h4 class="mt-3 mb-0 fw-bold">DeakinPay</h4>
+                <p class="mb-0 small opacity-75">Next-Gen Student Payments</p>
+            </div>
+            <div class="login-body">
+                <form id="loginForm">
+                    <div class="mb-4">
+                        <label class="form-label fw-medium">Deakin Email</label>
+                        <input type="email" class="form-control" id="studentEmail" placeholder="name@deakin.edu.au" required>
+                        <div class="invalid-feedback small" id="emailError"></div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-medium">Password</label>
+                        <div class="password-input-group">
+                            <input type="password" class="form-control" id="studentPassword" placeholder="••••••••" required>
+                            <button type="button" class="password-toggle" onclick="togglePassword()">
+                                <i class="far fa-eye" id="toggleIcon"></i>
+                            </button>
+                        </div>
+                        <div class="invalid-feedback small" id="passwordError"></div>
+                    </div>
+                    <div class="d-flex justify-content-between mb-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="rememberMe">
+                            <label class="form-check-label small" for="rememberMe">Remember me</label>
+                        </div>
+                        <a href="#" class="text-primary text-decoration-none small">Forgot password?</a>
+                    </div>
+                    <button type="button" onclick="validateLogin()" class="btn btn-deakin text-white w-100 fw-bold" id="loginBtn">
+                        <i class="fas fa-sign-in-alt me-2"></i> Login
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Page -->
+    <div id="paymentPage" style="display: none;">
+        <nav class="navbar navbar-expand-lg payment-header navbar-light">
+            <div class="container">
+                <a class="navbar-brand" href="#">
+                    <img src="deakin-logo.jpg" alt="Deakin" height="40">
+                    <span class="ms-2 fw-bold">DeakinPay</span>
+                </a>
+                <div class="d-flex align-items-center">
+                    <div class="me-4 d-none d-md-block">
+                        <div class="small text-muted">Logged in as</div>
+                        <div class="fw-medium" id="loggedInUser">Loading...</div>
+                    </div>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="logout()">
+                        <i class="fas fa-sign-out-alt me-1"></i> Logout
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container py-4">
+            <div class="row">
+                <!-- Student Info Column - INNOVATIVE DESIGN -->
+                <div class="col-lg-4 mb-4">
+                    <div class="student-profile-card">
+                        <div class="profile-header">
+                            <div class="profile-avatar">
+                                <i class="fas fa-user-graduate"></i>
+                            </div>
+                        </div>
+                        
+                        <div class="text-center mt-4">
+                            <h3 class="profile-name" id="studentName">John A. Smith</h3>
+                            <div class="profile-id" id="studentId">s224967779</div>
+                        </div>
+                        
+                        <div class="profile-section">
+                            <div class="section-title">
+                                <i class="fas fa-graduation-cap"></i> ACADEMIC DETAILS
+                            </div>
+                            
+                            <div class="detail-item">
+                                <span class="detail-label">Course:</span>
+                                <span class="detail-value">
+                                    <span class="course-highlight" id="studentCourse">Master of Information Technology (Professional)</span>
+                                </span>
+                            </div>
+                            
+                            <div class="detail-item">
+                                <span class="detail-label">Semester:</span>
+                                <span class="detail-value" id="studentSemester">Trimester 1, 2025</span>
+                            </div>
+                            
+                            <div class="detail-item">
+                                <span class="detail-label">Status:</span>
+                                <span class="detail-value">
+                                    <span id="studentStatus">Active - Full Time</span>
+                                    <span class="status-badge">Current</span>
+                                </span>
+                            </div>
+                            
+                            <div class="academic-progress">
+                                <div class="small fw-medium">Course Progress</div>
+                                <div class="progress-bar-container">
+                                    <div class="progress-bar"></div>
+                                </div>
+                                <div class="progress-text">
+                                    <span>75% completed</span>
+                                    <span class="progress-percentage">3/4 units</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="profile-section">
+                            <div class="section-title">
+                                <i class="fas fa-book-open"></i> CURRENT ENROLLMENT
+                            </div>
+                            
+                            <div class="units-container" id="enrolledUnits">
+                                <span class="unit-badge">
+                                    <i class="fas fa-laptop-code"></i> SIT774 - Web Technologies
+                                </span>
+                                <span class="unit-badge">
+                                    <i class="fas fa-project-diagram"></i> SIT782 - Project Delivery
+                                </span>
+                                <span class="unit-badge">
+                                    <i class="fas fa-chart-line"></i> SIT718 - Analytics
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div class="profile-section">
+                            <div class="profile-actions">
+                                <button class="profile-btn">
+                                    <i class="fas fa-id-card"></i> Profile
+                                </button>
+                                <button class="profile-btn">
+                                    <i class="fas fa-cog"></i> Settings
+                                </button>
+                                <button class="profile-btn">
+                                    <i class="fas fa-question-circle"></i> Help
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="profile-bg-element bg-element-1"></div>
+                        <div class="profile-bg-element bg-element-2"></div>
+                    </div>
+                </div>
+
+                <!-- Payment Column -->
+                <div class="col-lg-8">
+                    <!-- Fee Statement -->
+                    <div class="payment-card p-4 mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h4 class="mb-0 fw-medium"><i class="fas fa-receipt me-2 text-primary"></i> Fee Statement</h4>
+                            <button class="btn btn-sm btn-outline-primary" onclick="showTransactionHistory()">
+                                <i class="fas fa-history me-1"></i> View History
+                            </button>
+                        </div>
+                        
+                        <div class="table-responsive mb-4">
+                            <table class="table table-borderless" id="feeTable">
+                                <thead class="small text-muted">
+                                    <tr>
+                                        <th>Description</th>
+                                        <th>Due Date</th>
+                                        <th>Amount</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Fees will be added here by JavaScript -->
+                                </tbody>
+                                <tfoot class="table-active">
+                                    <tr>
+                                        <th class="fw-medium">Total Payable</th>
+                                        <th></th>
+                                        <th class="fw-medium" id="totalPayable">$0.00</th>
+                                        <th></th>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+
+                        <div class="alert alert-warning py-2 small mb-0">
+                            <i class="fas fa-exclamation-circle me-2"></i> Payment due by <span id="dueDate" class="fw-medium">loading...</span> to avoid late fees.
+                        </div>
+                    </div>
+
+                    <!-- Payment Methods -->
+                    <div class="payment-card p-4">
+                        <h4 class="mb-4 fw-medium"><i class="fas fa-credit-card me-2 text-primary"></i> Payment Method</h4>
+                        
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <div class="payment-method-btn active" onclick="selectPaymentMethod(this, 'credit')">
+                                    <img src="cd.png" class="payment-icon">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="paymentMethod" id="creditCard" checked>
+                                        <label class="form-check-label small fw-medium" for="creditCard">
+                                            Credit/Debit Card
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="payment-method-btn apple-btn" onclick="selectPaymentMethod(this, 'apple')">
+                                    <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/apple/apple-original.svg" class="apple-pay-icon">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="paymentMethod" id="applePay">
+                                        <label class="form-check-label small fw-medium text-white" for="applePay">
+                                            Apple Pay
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="payment-method-btn paypal-btn" onclick="selectPaymentMethod(this, 'paypal')">
+                                    <img src="paypal.png" class="payment-icon">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="paymentMethod" id="paypal">
+                                        <label class="form-check-label small fw-medium" for="paypal">
+                                            PayPal
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Credit Card Form -->
+                        <div id="creditCardForm">
+                            <div class="card-container">
+                                <div class="card-3d card-tilt" id="card3d">
+                                    <div class="card-front">
+                                        <div class="card-type" id="cardTypeIcon">
+                                            <i class="far fa-credit-card"></i>
+                                        </div>
+                                        <div class="card-number-display" id="cardNumberDisplay">
+                                            ENTER CARD NUMBER
+                                        </div>
+                                        <div class="card-details">
+                                            <div class="card-name" id="cardNameDisplay">
+                                                CARDHOLDER NAME
+                                            </div>
+                                            <div class="card-expiry" id="cardExpiryDisplay">
+                                                MM/YY
+                                            </div>
+                                        </div>
+                                        <button class="card-flip-btn" onclick="flipCard()">
+                                            <i class="fas fa-sync-alt"></i>
+                                        </button>
+                                    </div>
+                                    <div class="card-back">
+                                        <div class="card-magnetic-strip"></div>
+                                        <div class="card-cvv-display" id="cardCvvDisplay">
+                                            CVV: ENTER CODE
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-12">
+                                    <label class="form-label small fw-medium">Card Number</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="cardNumber" placeholder="1234 5678 9012 3456" maxlength="19" required>
+                                        <span class="input-group-text bg-transparent">
+                                            <i class="far fa-credit-card text-muted"></i>
+                                        </span>
+                                    </div>
+                                    <div class="invalid-feedback small" id="cardNumberError"></div>
+                                </div>
+                                <div class="col-md-12">
+                                    <label class="form-label small fw-medium">Cardholder Name</label>
+                                    <input type="text" class="form-control" id="cardholderName" placeholder="John Smith" required>
+                                    <div class="invalid-feedback small" id="cardholderNameError"></div>
+                                </div>
+                                <div class="col-md-12">
+                                    <div class="expiry-cvv-group">
+                                        <div class="w-50">
+                                            <label class="form-label small fw-medium">Expiry Date</label>
+                                            <input type="text" class="form-control" id="expiryDate" placeholder="MM/YY" maxlength="5" required>
+                                            <div class="invalid-feedback small" id="expiryDateError"></div>
+                                        </div>
+                                        <div class="w-50">
+                                            <label class="form-label small fw-medium">CVV</label>
+                                            <div class="input-group">
+                                                <input type="password" class="form-control" id="cvv" placeholder="•••" maxlength="4" required>
+                                                <span class="input-group-text bg-transparent">
+                                                    <i class="fas fa-question-circle text-muted" title="3-digit code on back of card"></i>
+                                                </span>
+                                            </div>
+                                            <div class="invalid-feedback small" id="cvvError"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Apple Pay Message -->
+                        <div id="appleMessage" class="alert alert-dark py-2 small mb-4" style="display: none;">
+                            <i class="fab fa-apple me-2"></i> You will be redirected to Apple Pay's secure payment gateway.
+                        </div>
+
+                        <!-- PayPal Message -->
+                        <div id="paypalMessage" class="alert alert-primary py-2 small mb-4" style="display: none;">
+                            <i class="fab fa-paypal me-2"></i> You will be redirected to PayPal's secure payment gateway.
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                            <div>
+                                <h5 class="mb-0 fw-medium">Total: <span id="paymentTotal">$0.00</span></h5>
+                                <small class="text-muted">Including all applicable fees</small>
+                            </div>
+                            <button class="btn btn-success fw-bold pulse-glow" onclick="processPayment()" id="payNowBtn">
+                                <i class="fas fa-lock me-2"></i> Pay Now
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transaction History Modal -->
+    <div class="modal fade" id="transactionHistoryModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content border-0">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-medium"><i class="fas fa-history me-2"></i> Payment History</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="small text-muted">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th>Method</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactionHistoryBody">
+                                <!-- Transactions will be added here by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Processing Modal -->
+    <div class="modal fade" id="processingModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0">
+                <div class="modal-body text-center p-5">
+                    <div class="spinner-border text-primary mb-4" style="width: 3rem; height: 3rem;" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <h3 class="mb-3">Processing Payment</h3>
+                    <p class="text-muted">Securely connecting to payment gateway...</p>
+                    <div class="progress mt-4" style="height: 6px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Success Modal -->
+    <div class="modal fade" id="paymentSuccessModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0">
+                <div class="modal-body text-center p-5">
+                    <div class="bg-success bg-opacity-10 rounded-circle d-inline-flex p-4 mb-4">
+                        <i class="fas fa-check-circle text-success fs-1"></i>
+                    </div>
+                    <h3 class="mb-3">Payment Successful!</h3>
+                    <p class="text-muted mb-4">Your payment of <span id="successAmount" class="fw-bold">$0.00</span> was processed successfully.</p>
+                    <div class="alert alert-success py-2 small mb-4">
+                        <i class="fas fa-envelope me-2"></i> Receipt sent to <span id="receiptEmail" class="fw-bold">your@email.com</span>
+                    </div>
+                    <div class="d-flex justify-content-center gap-3">
+                        <button class="btn btn-outline-secondary" onclick="downloadReceipt()">
+                            <i class="fas fa-file-pdf me-2"></i> Download Receipt
+                        </button>
+                        <button class="btn btn-primary" data-bs-dismiss="modal">
+                            <i class="fas fa-home me-2"></i> Return to Portal
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3D Secure Verification Modal -->
+    <div class="modal fade" id="secureVerificationModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0">
+                <div class="modal-body text-center p-5">
+                    <div class="bg-primary bg-opacity-10 rounded-circle d-inline-flex p-4 mb-4">
+                        <i class="fas fa-shield-alt text-primary fs-1"></i>
+                    </div>
+                    <h3 class="mb-3">Secure Verification</h3>
+                    <p class="text-muted mb-4">Complete verification with your bank</p>
+                    
+                    <div class="mb-4 p-4 border rounded bg-light">
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>Amount:</span>
+                            <span class="fw-bold" id="verificationAmount">$0.00</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>Card:</span>
+                            <span class="fw-bold" id="verificationCard">•••• •••• •••• 1234</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Bank:</span>
+                            <span class="fw-bold" id="verificationBank">Commonwealth Bank</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="form-label">SMS Verification Code</label>
+                        <input type="text" class="form-control text-center" id="smsCode" placeholder="123456" maxlength="6">
+                    </div>
+                    
+                    <div class="d-flex justify-content-center gap-3">
+                        <button class="btn btn-outline-danger" onclick="declinePayment()">
+                            <i class="fas fa-times me-2"></i> Cancel Payment
+                        </button>
+                        <button class="btn btn-success" onclick="verifyPayment()" id="verifyBtn">
+                            <i class="fas fa-check me-2"></i> Verify & Complete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Completion Animation -->
+    <div class="payment-complete" id="paymentComplete">
+        <div class="payment-complete-icon">
+            <i class="fas fa-check-circle"></i>
+        </div>
+        <h2 class="mb-3">Payment Complete!</h2>
+        <p class="text-muted">Your transaction was successful</p>
+    </div>
+                                     
+    
+</body>
+</html>
