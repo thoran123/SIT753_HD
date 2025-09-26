@@ -127,26 +127,38 @@ pipeline {
         }
         
        stage('Release to Production') {
+    agent any
     steps {
         script {
-            echo "🎯 Deploying to production..."
+            echo '🎯 Deploying to production...'
             sh '''
-                # Kill any process using port 3002
+                # Ensure any existing production server is killed
+                echo "Stopping any existing production server..."
+                pkill -f "PORT=3002" || true
+                pkill -f "node.*server.js.*3002" || true
                 lsof -ti:3002 | xargs kill -9 || true
                 sleep 2
-                
-                echo "Starting production server..."
-                NODE_ENV=production PORT=3002 node server.js > production.log 2>&1 &
+
+                # Start production server
+                echo "Starting production server on port 3002..."
+                NODE_ENV=production PORT=3002 nohup node server.js > production.log 2>&1 &
                 echo $! > prod-server.pid
-                sleep 10
-                
-                # Health check
-                if curl -f http://localhost:3002/api/health; then
-                    echo "✅ Production deployment successful!"
-                else
-                    echo "❌ Production deployment failed"
-                    exit 1
-                fi
+
+                # Wait for server to start
+                echo "Waiting for production server to start..."
+                for i in {1..30}; do
+                    if curl -f http://localhost:3002/api/health; then
+                        echo "Production server is up and healthy!"
+                        break
+                    else
+                        echo "Server not ready yet. Attempt $i/30"
+                        sleep 2
+                    fi
+                done
+
+                # Final health check
+                curl -f http://localhost:3002/api/health || { echo "Production server health check failed"; exit 1; }
+                echo '✅ Production deployment successful'
             '''
         }
     }
