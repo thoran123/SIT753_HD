@@ -1,12 +1,17 @@
 const request = require('supertest');
-const { app } = require('../../server'); // Import app without starting server
+const app = require('../../server'); // This now gets the app without starting server
 
 describe('Server Unit Tests', () => {
-  // Close the app after all tests
-  afterAll(async () => {
-    // Add a small delay to ensure all connections are closed
-    await new Promise(resolve => setTimeout(resolve, 100));
-  });
+    test('Health check endpoint should work', async () => {
+        const res = await request(app).get('/api/health');
+        expect(res.statusCode).toBe(200);
+    });
+
+    test('Info endpoint should return application info', async () => {
+        const res = await request(app).get('/api/info');
+        expect(res.statusCode).toBe(200);
+        expect(res.body).toHaveProperty('name');
+    });
 
   describe('Health Check Endpoint', () => {
     test('GET /api/health should return 200 and health status', async () => {

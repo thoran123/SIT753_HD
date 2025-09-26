@@ -214,12 +214,21 @@ const server = app.listen(PORT, () => {
 module.exports = { app, server };
 
 // Only start server if this file is run directly (not when required by tests)
+// Only start the server if this file is run directly (not when imported by tests)
 if (require.main === module) {
+  const server = app.listen(PORT, () => {
+      logger.info(`Server running on port ${PORT} in ${NODE_ENV} mode`);
+  });
+
+  // Graceful shutdown
   process.on('SIGTERM', () => {
-    logger.info('SIGTERM received, shutting down gracefully');
-    server.close(() => {
-      logger.info('Process terminated');
-      process.exit(0);
-    });
+      logger.info('SIGTERM received, shutting down gracefully');
+      server.close(() => {
+          logger.info('Process terminated');
+          process.exit(0);
+      });
   });
 }
+
+// Export just the app for testing
+module.exports = app;
