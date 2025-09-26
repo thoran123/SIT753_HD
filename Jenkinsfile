@@ -171,27 +171,41 @@ pipeline {
         }
         
         stage('Monitoring & Alerting') {
-            steps {
-                script {
-                    echo "📊 Setting up monitoring..."
-                    sh '''
-                        echo "=== Monitoring Dashboard ==="
-                        echo "🌐 Test Environment: http://localhost:3001"
-                        echo "🎯 Production Environment: http://localhost:3002"
-                        echo "❤️ Health Check: http://localhost:3002/api/health"
-                        echo "📈 Metrics: http://localhost:3002/metrics"
-                        echo "ℹ️ Application Info: http://localhost:3002/api/info"
-                        
-                        # Test the endpoints
-                        curl -s http://localhost:3002/api/health | grep healthy || echo "Health check passed"
-                        curl -s http://localhost:3002/api/info | grep version || echo "Info endpoint working"
-                        
-                        echo "✅ Monitoring setup completed"
-                    '''
-                }
-            }
+    steps {
+        script {
+            echo "📊 Setting up monitoring..."
+            sh '''
+                # Start Prometheus
+                docker run -d --name prometheus -p 9090:9090 prom/prometheus:latest || echo "Prometheus started or already running"
+                
+                # Start Grafana
+                docker run -d --name grafana -p 3003:3000 -e "GF_SECURITY_ADMIN_PASSWORD=admin" grafana/grafana:latest || echo "Grafana started or already running"
+                
+                # Start SonarQube
+                docker run -d --name sonarqube -p 9000:9000 sonarqube:latest || echo "SonarQube started or already running"
+                
+                echo "Waiting for services to start..."
+                sleep 30
+                
+                echo "=== Monitoring Services ==="
+                echo "✅ Prometheus: http://localhost:9090"
+                echo "✅ Grafana: http://localhost:3003 (admin/admin)"
+                echo "✅ SonarQube: http://localhost:9000 (admin/admin)"
+                echo "✅ Production App: http://localhost:3002"
+                echo "✅ Test App: http://localhost:3001"
+                
+                # Test if services are accessible
+                curl -f http://localhost:3002/api/health && echo "✅ Production app is running" || echo "⚠️ Production app not accessible"
+                curl -f http://localhost:3001/api/health && echo "✅ Test app is running" || echo "⚠️ Test app not accessible"
+                
+                # Try to access monitoring services
+                curl -s http://localhost:9090 >/dev/null && echo "✅ Prometheus is running" || echo "⚠️ Prometheus not accessible"
+                curl -s http://localhost:3003 >/dev/null && echo "✅ Grafana is running" || echo "⚠️ Grafana not accessible" 
+                curl -s http://localhost:9000 >/dev/null && echo "✅ SonarQube is running" || echo "⚠️ SonarQube not accessible"
+            '''
         }
     }
+}
     
     post {
         always {
