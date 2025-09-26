@@ -170,35 +170,65 @@ pipeline {
             }
         }
         
-        stage('Deploy Production (Non-Main Branch)') {
-            when {
-                not {
-                    anyOf {
-                        branch 'main'
-                        branch 'master'
-                    }
-                }
-            }
-            steps {
-                script {
-                    echo "🚀 Deploying production-like environment..."
-                    sh '''
-                        # Kill any existing processes
-                        pkill -f "PORT=3002" || true
-                        sleep 2
-                        
-                        # Start production server (even on non-main branches for demo)
-                        NODE_ENV=production PORT=3002 node server.js > prod-server.log 2>&1 &
-                        echo $! > prod-server.pid
-                        sleep 5
-                        
-                        # Health check
-                        curl -f http://localhost:3002/api/health || exit 1
-                        echo "✅ Production-like deployment successful"
-                    '''
-                }
+       stage('Deploy Production (Non-Main Branch)') {
+    when {
+        not {
+            anyOf {
+                branch 'main'
+                branch 'master'
             }
         }
+    }
+    steps {
+        script {
+            echo "🚀 Deploying production-like environment..."
+            sh '''
+                # Kill any existing processes
+                pkill -f "PORT=3002" || true
+                pkill -f "node server.js" || true
+                sleep 3
+                
+                # Start production server with proper logging
+                echo "Starting production server on port 3002..."
+                NODE_ENV=production PORT=3002 nohup node server.js > production.log 2>&1 &
+                PROD_PID=$!
+                echo $PROD_PID > prod-server.pid
+                
+                echo "Waiting for server to start..."
+                sleep 10
+                
+                # Check if process is running
+                if ps -p $PROD_PID > /dev/null; then
+                    echo "✅ Production server is running with PID: $PROD_PID"
+                else
+                    echo "❌ Production server failed to start"
+                    cat production.log || true
+                    exit 1
+                fi
+                
+                # Health check with retries
+                echo "Performing health check..."
+                for i in {1..5}; do
+                    if curl -f http://localhost:3002/api/health; then
+                        echo "✅ Production deployment successful"
+                        exit 0
+                    fi
+                    echo "⏳ Health check attempt $i/5 failed, retrying..."
+                    sleep 5
+                done
+                
+                echo "❌ Production health check failed after 5 attempts"
+                cat production.log || true
+                exit 1
+            '''
+        }
+    }
+    post {
+        always {
+            archiveArtifacts artifacts: 'production.log', allowEmptyArchive: true
+        }
+    }
+}
         
         stage('Monitoring & Alerting') {
             steps {
