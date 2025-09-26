@@ -151,28 +151,7 @@ pipeline {
         }
     }
 }
-        
-        stage('Monitoring & Alerting') {
-            steps {
-                script {
-                    echo "📊 Monitoring & Alerting Setup"
-                    sh '''
-                        echo "=== APPLICATION DEPLOYMENT SUCCESSFUL ==="
-                        echo "🌐 Production: http://localhost:3002"
-                        echo "🧪 Test: http://localhost:3001"
-                        echo "❤️ Health: http://localhost:3002/api/health"
-                        echo "📊 Metrics: http://localhost:3002/metrics"
-                        
-                        # Verify deployment
-                        curl -s http://localhost:3002/api/health && echo "✅ Production app is healthy"
-                        curl -s http://localhost:3001/api/health && echo "✅ Test app is healthy"
-                        
-                        echo "🎉 All 7 pipeline stages completed successfully!"
-                    '''
-                }
-            }
-        }
-    }
+       
     
     post {
         always {
