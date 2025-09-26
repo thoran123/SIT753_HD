@@ -131,45 +131,23 @@ pipeline {
         script {
             echo "🎯 Deploying to production..."
             sh '''
-                # First, stop the test server to free up resources
-                pkill -f "PORT=3001" || true
-                pkill -f "PORT=3002" || true
-                sleep 3
+                # Kill any process using port 3002
+                lsof -ti:3002 | xargs kill -9 || true
+                sleep 2
                 
                 echo "Starting production server..."
-                # Start production server in background
-                NODE_ENV=production PORT=3002 nohup node server.js > production.log 2>&1 &
-                PROD_PID=$!
-                echo $PROD_PID > prod-server.pid
-                
-                echo "Waiting for production server to start..."
+                NODE_ENV=production PORT=3002 node server.js > production.log 2>&1 &
+                echo $! > prod-server.pid
                 sleep 10
                 
-                # Check if process is running
-                if ps -p $PROD_PID > /dev/null; then
-                    echo "✅ Production server started with PID: $PROD_PID"
-                else
-                    echo "❌ Production server failed to start"
-                    cat production.log || true
-                    # Don't fail the pipeline - continue for demo purposes
-                    echo "⚠️ Continuing pipeline for demonstration"
-                    exit 0
-                fi
-                
-                # Health check with better error handling
-                echo "Testing production deployment..."
+                # Health check
                 if curl -f http://localhost:3002/api/health; then
                     echo "✅ Production deployment successful!"
                 else
-                    echo "⚠️ Production health check failed, but continuing pipeline..."
-                    echo "This is normal for demonstration purposes"
+                    echo "❌ Production deployment failed"
+                    exit 1
                 fi
             '''
-        }
-    }
-    post {
-        always {
-            archiveArtifacts artifacts: 'production.log', allowEmptyArchive: true
         }
     }
 }
