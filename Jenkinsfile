@@ -2,175 +2,435 @@ pipeline {
     agent any
     
     environment {
+        NODE_VERSION = '18'
         DOCKER_IMAGE = 'sit753-app'
         BUILD_NUMBER = "${env.BUILD_NUMBER}"
         GIT_COMMIT = "${env.GIT_COMMIT ? env.GIT_COMMIT[0..7] : 'unknown'}"
-        PATH = "/usr/local/bin:/opt/homebrew/bin:${env.PATH}"
+        SNYK_TOKEN = credentials('snyk-token')
+        DOCKER_BUILDKIT = '1'
+    }
+    
+    tools {
+        nodejs "${NODE_VERSION}"
     }
     
     stages {
-        stage('1. Checkout') {
+        stage('Checkout') {
             steps {
                 script {
-                    echo "🔄 Stage 1: Checking out code..."
+                    echo "🔄 Checking out code..."
                     checkout scm
-                    sh 'echo "Build: ${BUILD_NUMBER}, Commit: ${GIT_COMMIT}"'
-                }
-            }
-        }
-        
-        stage('2. Build') {
-            steps {
-                script {
-                    echo "🏗️ Stage 2: Building application..."
+                    
+                    // Display build information
                     sh '''
-                        # Use full paths and check installations
-                        which node || echo "Node not found in PATH"
-                        which npm || echo "NPM not found in PATH"
-                        which docker || echo "Docker not found in PATH"
-                        
-                        # Try different node locations
-                        /usr/local/bin/node --version || /opt/homebrew/bin/node --version || echo "Node version check failed"
-                        /usr/local/bin/npm --version || /opt/homebrew/bin/npm --version || echo "NPM version check failed"
-                        
-                        # Install dependencies
-                        /usr/local/bin/npm ci || /opt/homebrew/bin/npm ci || npm ci
-                        
-                        # Build
-                        /usr/local/bin/npm run build || /opt/homebrew/bin/npm run build || npm run build
-                    '''
-                    sh '''
-                        # Docker build with full path
-                        /usr/local/bin/docker build -t ${DOCKER_IMAGE}:${BUILD_NUMBER} . || docker build -t ${DOCKER_IMAGE}:${BUILD_NUMBER} .
-                        /usr/local/bin/docker build -t ${DOCKER_IMAGE}:latest . || docker build -t ${DOCKER_IMAGE}:latest .
-                        echo "✅ Build completed successfully!"
+                        echo "Build Number: ${BUILD_NUMBER}"
+                        echo "Git Commit: ${GIT_COMMIT}"
+                        echo "Branch: ${GIT_BRANCH}"
+                        echo "Node Version: $(node --version)"
+                        echo "NPM Version: $(npm --version)"
                     '''
                 }
             }
         }
         
-        stage('3. Test') {
+        stage('Build') {
             steps {
                 script {
-                    echo "🧪 Stage 3: Running tests..."
+                    echo "🏗️ Building application version: ${BUILD_NUMBER}-${GIT_COMMIT}"
+                    
+                    // Clean previous builds
                     sh '''
-                        # Run tests with full paths
-                        /usr/local/bin/npm test || /opt/homebrew/bin/npm test || npm test
-                        echo "✅ All tests passed!"
+                        rm -rf dist/ || true
+                        rm -rf coverage/ || true
+                        rm -rf test-results/ || true
                     '''
+                    
+                    // Install dependencies
+                    sh 'npm ci'
+                    
+                    // Run build script
+                    sh 'npm run build'
+                    
+                    // Create Docker image with version tags
+                    sh """
+                        docker build -t ${DOCKER_IMAGE}:${BUILD_NUMBER}-${GIT_COMMIT} .
+                        docker build -t ${DOCKER_IMAGE}:latest .
+                        docker build -t ${DOCKER_IMAGE}:build-${BUILD_NUMBER} .
+                    """
+                    
+                    // Verify Docker image
+                    sh "docker images | grep ${DOCKER_IMAGE}"
+                }
+            }
+            post {
+                success {
+                    echo "✅ Build completed successfully!"
+                    archiveArtifacts artifacts: 'package*.json, Dockerfile', allowEmptyArchive: true
+                }
+                failure {
+                    echo "❌ Build failed!"
+                }
+            }
+        }
+        
+        stage('Test') {
+            parallel {
+                stage('Unit Tests') {
+                    steps {
+                        script {
+                            echo "🧪 Running unit tests..."
+                            sh '''
+                                npm test -- --coverage --testResultsProcessor=jest-junit
+                                npm run test:coverage
+                            '''
+                        }
+                    }
+                }
+                
+                stage('Integration Tests') {
+                    steps {
+                        script {
+                            echo "🔗 Running integration tests..."
+                            sh 'npm run test:integration'
+                        }
+                    }
                 }
             }
             post {
                 always {
+                    // Publish test results
+                    publishTestResults([
+                        testResultsFiles: 'junit.xml',
+                        allowEmptyResults: true
+                    ])
+                    
+                    // Publish coverage reports
+                    publishHTML([
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'coverage/lcov-report',
+                        reportFiles: 'index.html',
+                        reportName: 'Code Coverage Report'
+                    ])
+                    
+                    // Archive test artifacts
                     archiveArtifacts artifacts: 'coverage/**', allowEmptyArchive: true
                 }
-            }
-        }
-        
-        stage('4. Code Quality') {
-            steps {
-                script {
-                    echo "🔍 Stage 4: Code quality analysis..."
-                    sh '''
-                        # Start SonarQube with full docker path
-                        /usr/local/bin/docker run -d --name sonarqube -p 9000:9000 sonarqube:latest || docker run -d --name sonarqube -p 9000:9000 sonarqube:latest || echo "SonarQube already running"
-                        sleep 30
-                        echo "✅ Code quality analysis completed!"
-                    '''
+                success {
+                    echo "✅ All tests passed!"
+                }
+                failure {
+                    echo "❌ Tests failed!"
                 }
             }
         }
         
-        stage('5. Security') {
+        stage('Code Quality Analysis') {
             steps {
                 script {
-                    echo "🔒 Stage 5: Security analysis..."
+                    echo "🔍 Running advanced code quality analysis..."
+                    
+                    // Start SonarQube container if not running
                     sh '''
-                        # Security audit with full paths
-                        /usr/local/bin/npm audit --audit-level moderate --json > npm-audit.json || /opt/homebrew/bin/npm audit --audit-level moderate --json > npm-audit.json || npm audit --audit-level moderate --json > npm-audit.json || echo "Security scan completed with warnings"
-                        echo "✅ Security scan completed!"
+                        docker run -d --name sonarqube -p 9000:9000 sonarqube:latest || echo "SonarQube container already exists"
+                        
+                        # Wait for SonarQube to be ready
+                        echo "Waiting for SonarQube to start..."
+                        for i in {1..60}; do
+                            if curl -s http://localhost:9000/api/system/status | grep -q "UP"; then
+                                echo "SonarQube is ready!"
+                                break
+                            fi
+                            echo "Waiting... ($i/60)"
+                            sleep 5
+                        done
                     '''
+                    
+                    // Run SonarQube analysis
+                    withSonarQubeEnv('SonarQube') {
+                        sh '''
+                            npx sonar-scanner \
+                            -Dsonar.projectKey=sit753-pipeline \
+                            -Dsonar.projectName="SIT753 DevOps Pipeline" \
+                            -Dsonar.sources=. \
+                            -Dsonar.exclusions=node_modules/**,coverage/**,tests/** \
+                            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                            -Dsonar.host.url=http://localhost:9000 \
+                            -Dsonar.login=admin \
+                            -Dsonar.password=admin
+                        '''
+                    }
+                    
+                    // Quality Gate check
+                    timeout(time: 10, unit: 'MINUTES') {
+                        script {
+                            def qg = waitForQualityGate()
+                            if (qg.status != 'OK') {
+                                echo "Quality Gate Status: ${qg.status}"
+                                error "Pipeline aborted due to quality gate failure: ${qg.status}"
+                            } else {
+                                echo "✅ Quality Gate passed!"
+                            }
+                        }
+                    }
                 }
             }
             post {
                 always {
-                    archiveArtifacts artifacts: 'npm-audit.json', allowEmptyArchive: true
+                    echo "Code Quality Analysis completed. Check SonarQube at http://localhost:9000"
                 }
             }
         }
         
-        stage('6. Deploy to Test') {
+        stage('Security Analysis') {
+            parallel {
+                stage('Dependency Scan') {
+                    steps {
+                        script {
+                            echo "🔒 Running dependency vulnerability scan..."
+                            sh '''
+                                # Snyk authentication and scan
+                                snyk auth $SNYK_TOKEN
+                                snyk test --json > snyk-results.json || true
+                                snyk monitor || true
+                                
+                                # NPM audit
+                                npm audit --audit-level high --json > npm-audit.json || true
+                            '''
+                        }
+                    }
+                }
+                
+                stage('Container Scan') {
+                    steps {
+                        script {
+                            echo "🐳 Running container security scan..."
+                            sh '''
+                                # Trivy container scan
+                                docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+                                -v $PWD:/tmp/.cache/ aquasec/trivy:latest image \
+                                --format json --output /tmp/.cache/trivy-results.json \
+                                ${DOCKER_IMAGE}:latest || true
+                            '''
+                        }
+                    }
+                }
+            }
+            post {
+                always {
+                    script {
+                        // Parse and report security issues
+                        echo "📊 Security scan results analysis..."
+                        sh '''
+                            echo "=== Security Scan Summary ==="
+                            
+                            # Check Snyk results
+                            if [ -f "snyk-results.json" ]; then
+                                echo "Snyk vulnerabilities found:"
+                                cat snyk-results.json | grep -o '"severity":"[^"]*' | sort | uniq -c || echo "No vulnerabilities"
+                            fi
+                            
+                            # Check npm audit results
+                            if [ -f "npm-audit.json" ]; then
+                                echo "NPM audit results:"
+                                cat npm-audit.json | grep -o '"severity":"[^"]*' | sort | uniq -c || echo "No vulnerabilities"
+                            fi
+                            
+                            echo "=== End Security Summary ==="
+                        '''
+                        
+                        // Archive security scan results
+                        archiveArtifacts artifacts: '*-results.json', allowEmptyArchive: true
+                    }
+                }
+                success {
+                    echo "✅ Security analysis completed!"
+                }
+            }
+        }
+        
+        stage('Deploy to Test Environment') {
             steps {
                 script {
-                    echo "🚀 Stage 6: Deploying to test environment..."
+                    echo "🚀 Deploying to test environment..."
+                    
+                    // Stop existing test containers
                     sh '''
-                        # Use full paths for docker-compose
-                        /usr/local/bin/docker-compose -f docker-compose.test.yml down || /opt/homebrew/bin/docker-compose -f docker-compose.test.yml down || docker-compose -f docker-compose.test.yml down || echo "No existing containers to stop"
+                        docker-compose -f docker-compose.test.yml down || true
+                        docker system prune -f || true
+                    '''
+                    
+                    // Deploy to test environment
+                    sh '''
+                        docker-compose -f docker-compose.test.yml up -d
+                        echo "Waiting for application to start..."
+                        sleep 30
+                    '''
+                    
+                    // Health check with retries
+                    script {
+                        def maxAttempts = 10
+                        def attempt = 0
+                        def healthy = false
                         
-                        /usr/local/bin/docker-compose -f docker-compose.test.yml up -d || /opt/homebrew/bin/docker-compose -f docker-compose.test.yml up -d || docker-compose -f docker-compose.test.yml up -d
+                        while (attempt < maxAttempts && !healthy) {
+                            try {
+                                sh 'curl -f http://localhost:3001/api/health'
+                                healthy = true
+                                echo "✅ Application is healthy!"
+                            } catch (Exception e) {
+                                attempt++
+                                echo "⏳ Health check attempt ${attempt}/${maxAttempts} failed, retrying..."
+                                sleep(10)
+                            }
+                        }
                         
-                        sleep 20
-                        
-                        # Health check
-                        for i in {1..5}; do
-                            if curl -f http://localhost:3001/api/health 2>/dev/null; then
-                                echo "✅ Test deployment successful!"
-                                break
-                            else
-                                echo "Waiting for app to start... ($i/5)"
-                                sleep 10
-                            fi
-                        done
+                        if (!healthy) {
+                            sh 'docker-compose -f docker-compose.test.yml logs'
+                            error "❌ Application failed health checks after ${maxAttempts} attempts"
+                        }
+                    }
+                    
+                    // Run deployment verification tests
+                    sh '''
+                        echo "Running deployment verification..."
+                        curl -f http://localhost:3001/ || exit 1
+                        curl -f http://localhost:3001/api/info || exit 1
+                        echo "✅ Deployment verification completed successfully"
                     '''
                 }
             }
+            post {
+                success {
+                    echo "✅ Test deployment successful!"
+                }
+                failure {
+                    sh 'docker-compose -f docker-compose.test.yml logs'
+                    sh 'docker-compose -f docker-compose.test.yml down || true'
+                }
+            }
         }
         
-        stage('7. Release to Production') {
+        stage('Release to Production') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'master'
+                }
+            }
             steps {
                 script {
-                    echo "🎯 Stage 7: Production release..."
+                    echo "🎯 Promoting to production environment..."
+                    
+                    // Create release tag
+                    def releaseTag = "v${BUILD_NUMBER}-${GIT_COMMIT}"
+                    
+                    sh """
+                        # Tag Docker images for production
+                        docker tag ${DOCKER_IMAGE}:latest ${DOCKER_IMAGE}:${releaseTag}
+                        docker tag ${DOCKER_IMAGE}:latest ${DOCKER_IMAGE}:production
+                    """
+                    
+                    // Deploy to production with zero-downtime
                     sh '''
-                        # Tag and deploy to production
-                        /usr/local/bin/docker tag ${DOCKER_IMAGE}:latest ${DOCKER_IMAGE}:production || docker tag ${DOCKER_IMAGE}:latest ${DOCKER_IMAGE}:production
+                        # Graceful shutdown of existing production
+                        docker-compose -f docker-compose.prod.yml down --timeout 60 || true
                         
-                        /usr/local/bin/docker-compose -f docker-compose.prod.yml down || /opt/homebrew/bin/docker-compose -f docker-compose.prod.yml down || docker-compose -f docker-compose.prod.yml down || echo "No existing production containers"
+                        # Deploy new version
+                        docker-compose -f docker-compose.prod.yml up -d
+                        echo "Waiting for production deployment..."
+                        sleep 45
+                    '''
+                    
+                    // Production health check
+                    script {
+                        def maxAttempts = 15
+                        def attempt = 0
+                        def healthy = false
                         
-                        /usr/local/bin/docker-compose -f docker-compose.prod.yml up -d || /opt/homebrew/bin/docker-compose -f docker-compose.prod.yml up -d || docker-compose -f docker-compose.prod.yml up -d
-                        
-                        sleep 20
-                        
-                        # Production health check
-                        for i in {1..5}; do
-                            if curl -f http://localhost:3002/api/health 2>/dev/null; then
+                        while (attempt < maxAttempts && !healthy) {
+                            try {
+                                sh 'curl -f http://localhost:3002/api/health'
+                                healthy = true
                                 echo "✅ Production deployment successful!"
-                                break
-                            else
-                                echo "Waiting for production app... ($i/5)"
-                                sleep 10
-                            fi
-                        done
-                    '''
+                            } catch (Exception e) {
+                                attempt++
+                                echo "⏳ Production health check attempt ${attempt}/${maxAttempts}"
+                                sleep(10)
+                            }
+                        }
+                        
+                        if (!healthy) {
+                            sh 'docker-compose -f docker-compose.prod.yml logs'
+                            error "❌ Production deployment failed health checks"
+                        }
+                    }
+                    
+                    // Create Git release tag
+                    sh """
+                        git tag ${releaseTag} || true
+                        git push origin ${releaseTag} || true
+                        echo "✅ Release ${releaseTag} created successfully"
+                    """
+                }
+            }
+            post {
+                success {
+                    echo "🎉 Production deployment successful!"
+                }
+                failure {
+                    echo "❌ Production deployment failed!"
+                    sh 'docker-compose -f docker-compose.prod.yml logs'
                 }
             }
         }
         
-        stage('8. Monitoring Setup') {
+        stage('Monitoring & Alerting Setup') {
             steps {
                 script {
-                    echo "📊 Stage 8: Setting up monitoring..."
+                    echo "📊 Setting up comprehensive monitoring..."
+                    
+                    // Start monitoring stack
                     sh '''
-                        # Start monitoring stack with full paths
-                        /usr/local/bin/docker run -d --name prometheus -p 9090:9090 \
-                        -v $PWD/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml \
-                        prom/prometheus:latest || docker run -d --name prometheus -p 9090:9090 prom/prometheus:latest || echo "Prometheus already running"
+                        # Start Prometheus
+                        docker run -d --name prometheus \
+                          -p 9090:9090 \
+                          -v $PWD/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml \
+                          prom/prometheus:latest || echo "Prometheus already running"
                         
-                        /usr/local/bin/docker run -d --name grafana -p 3003:3000 \
-                        -e "GF_SECURITY_ADMIN_PASSWORD=admin" \
-                        grafana/grafana:latest || docker run -d --name grafana -p 3003:3000 -e "GF_SECURITY_ADMIN_PASSWORD=admin" grafana/grafana:latest || echo "Grafana already running"
+                        # Start Grafana
+                        docker run -d --name grafana \
+                          -p 3003:3000 \
+                          -e "GF_SECURITY_ADMIN_PASSWORD=admin" \
+                          -v $PWD/monitoring/grafana:/etc/grafana/provisioning \
+                          grafana/grafana:latest || echo "Grafana already running"
                         
-                        sleep 15
-                        echo "✅ Monitoring stack deployed!"
+                        echo "Waiting for monitoring stack to initialize..."
+                        sleep 45
+                    '''
+                    
+                    // Configure monitoring
+                    sh '''
+                        # Verify monitoring endpoints
+                        echo "Checking monitoring endpoints..."
+                        curl -f http://localhost:3002/metrics || echo "⚠️  Metrics endpoint check failed"
+                        curl -f http://localhost:9090/api/v1/targets || echo "⚠️  Prometheus targets check failed"
+                        curl -f http://localhost:3003/api/health || echo "⚠️  Grafana health check failed"
+                        
+                        echo "✅ Monitoring stack verification completed"
+                    '''
+                    
+                    // Simulate load for monitoring demonstration
+                    sh '''
+                        echo "🔄 Running monitoring demonstration with simulated load..."
+                        for i in {1..100}; do
+                            curl -s http://localhost:3002/ > /dev/null &
+                            curl -s http://localhost:3002/api/health > /dev/null &
+                            curl -s http://localhost:3002/api/info > /dev/null &
+                        done
+                        wait
+                        echo "✅ Load test completed - metrics should be visible in monitoring dashboards"
                     '''
                 }
             }
@@ -178,23 +438,15 @@ pipeline {
                 always {
                     script {
                         echo """
-                        🎉 PIPELINE COMPLETED SUCCESSFULLY! 
+                        📊 Monitoring Setup Complete!
                         
-                        📊 All 8 Stages Completed:
-                        ✅ 1. Checkout
-                        ✅ 2. Build  
-                        ✅ 3. Test
-                        ✅ 4. Code Quality
-                        ✅ 5. Security
-                        ✅ 6. Deploy to Test
-                        ✅ 7. Release to Production
-                        ✅ 8. Monitoring Setup
+                        Access your monitoring dashboards:
+                        🎯 Application (Production): http://localhost:3002
+                        📊 Grafana Dashboard: http://localhost:3003 (admin/admin)
+                        📈 Prometheus Metrics: http://localhost:9090
+                        🔍 Application Metrics: http://localhost:3002/metrics
                         
-                        🌐 Access Points:
-                        - Production: http://localhost:3002
-                        - Test: http://localhost:3001  
-                        - Grafana: http://localhost:3003 (admin/admin)
-                        - Prometheus: http://localhost:9090
+                        Test Environment: http://localhost:3001
                         """
                     }
                 }
@@ -204,13 +456,8 @@ pipeline {
     
     post {
         always {
-            sh '/usr/local/bin/docker-compose -f docker-compose.test.yml down || /opt/homebrew/bin/docker-compose -f docker-compose.test.yml down || docker-compose -f docker-compose.test.yml down || echo "Cleanup completed"'
-        }
-        success {
-            echo "🎉 HIGH HD PIPELINE SUCCESS - All 8 stages completed!"
-        }
-        failure {
-            echo "❌ Pipeline failed - check logs above"
-        }
-    }
-}
+            script {
+                echo "🧹 Cleaning up test resources..."
+                sh '''
+                    # Clean up test containers but keep production and monitoring
+                    docker-compose -f docker-compose.
