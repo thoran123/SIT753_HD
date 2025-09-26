@@ -205,17 +205,21 @@ process.on('SIGTERM', () => {
   });
 });
 
+// At the bottom of server.js, replace the server startup with:
 const server = app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT} in ${NODE_ENV} mode`);
 });
 
-// Update active connections
-server.on('connection', () => {
-  activeConnections.inc();
-});
+// Export the server for testing
+module.exports = { app, server };
 
-server.on('close', () => {
-  activeConnections.dec();
-});
-
-module.exports = app;
+// Only start server if this file is run directly (not when required by tests)
+if (require.main === module) {
+  process.on('SIGTERM', () => {
+    logger.info('SIGTERM received, shutting down gracefully');
+    server.close(() => {
+      logger.info('Process terminated');
+      process.exit(0);
+    });
+  });
+}
