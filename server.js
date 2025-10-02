@@ -196,39 +196,52 @@ app.use((req, res) => {
   });
 });
 
+// Server startup with proper error handling
+const startServer = () => {
+  return new Promise((resolve, reject) => {
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      logger.info(`✅ Server running on port ${PORT} in ${NODE_ENV} mode`);
+      logger.info(`✅ Health endpoint: http://0.0.0.0:${PORT}/api/health`);
+      resolve(server);
+    }).on('error', (err) => {
+      logger.error(`❌ Server failed to start: ${err.message}`);
+      if (err.code === 'EADDRINUSE') {
+        logger.error(`❌ Port ${PORT} is already in use`);
+      }
+      reject(err);
+    });
+  });
+};
+
 // Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  server.close(() => {
-    logger.info('Process terminated');
-    process.exit(0);
-  });
-});
+const gracefulShutdown = (server) => {
+  return () => {
+    logger.info('SIGTERM received, shutting down gracefully');
+    server.close(() => {
+      logger.info('Process terminated');
+      process.exit(0);
+    });
 
-// At the bottom of server.js, replace the server startup with:
-const server = app.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT} in ${NODE_ENV} mode`);
-});
+    // Force close after 10 seconds
+    setTimeout(() => {
+      logger.error('Forcing shutdown after timeout');
+      process.exit(1);
+    }, 10000);
+  };
+};
 
-// Export the server for testing
-module.exports = { app, server };
-
-// Only start server if this file is run directly (not when required by tests)
-// Only start the server if this file is run directly (not when imported by tests)
+// Start server only if this file is run directly
 if (require.main === module) {
-  const server = app.listen(PORT, () => {
-      logger.info(`Server running on port ${PORT} in ${NODE_ENV} mode`);
-  });
-
-  // Graceful shutdown
-  process.on('SIGTERM', () => {
-      logger.info('SIGTERM received, shutting down gracefully');
-      server.close(() => {
-          logger.info('Process terminated');
-          process.exit(0);
-      });
-  });
+  startServer()
+    .then(server => {
+      process.on('SIGTERM', gracefulShutdown(server));
+      process.on('SIGINT', gracefulShutdown(server));
+    })
+    .catch(err => {
+      logger.error('Failed to start server:', err);
+      process.exit(1);
+    });
 }
 
-// Export just the app for testing
-module.exports = app;
+// Export for testing
+module.exports = { app, startServer };
